@@ -1,0 +1,29 @@
+# Dependencies & builds
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+credentials
+.aws/
+
+# Local data (SQLite metadata + local-dev certificate files)
+backend/database/*.db
+backend/database/*.db-*
+backend/storage/
+
+# Logs & OS / editor files
+logs/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
