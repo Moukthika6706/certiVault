@@ -1,182 +1,223 @@
-# CertiVault
+<div align="center">
 
-**Cloud-based certificate issuance and verification on Amazon Web Services.**
+<h1>CertiVault</h1>
 
-CertiVault lets an institution issue digital certificates, store them securely in **Amazon S3**, and lets anyone verify a certificate's authenticity in seconds with its unique ID or QR code. The application runs on **Amazon EC2**, reaches S3 through a least-privilege **IAM role**, and is monitored with **Amazon CloudWatch**.
+<img width="96" height="96" alt="image" src="https://github.com/user-attachments/assets/39b6bc48-3926-4f4a-bd58-38c723b08eb6" />
 
-> B.Tech Cloud Computing course project. The website is the product; the AWS infrastructure is the point.
+<p><b>Issue, store, and verify digital certificates - securely, on AWS.</b></p>
 
-![CertiVault AWS architecture](documentation/images/architecture.svg)
+<p>
+CertiVault lets an institution issue tamper-evident certificates, keeps every PDF in a private,
+encrypted Amazon S3 bucket, and lets anyone verify authenticity in seconds with a certificate ID or QR code.
+The app runs on EC2 and reaches S3 through a least-privilege IAM role 
+</p>
 
----
+<p>
+  <a href="https://certivault.27052027.xyz"><b>Live application</b></a> &nbsp;·&nbsp;
+  <a href="#system-architecture">Architecture</a> &nbsp;·&nbsp;
+  <a href="#key-features">Features</a> &nbsp;·&nbsp;
+  <a href="#run-locally">Run locally</a> &nbsp;·&nbsp;
+  <a href="#documentation">Docs</a>
+</p>
 
-## Contents
+<p>
+  <img alt="React" src="https://img.shields.io/badge/React-19-20232A?style=flat-square&logo=react&logoColor=61DAFB">
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-22_LTS-339933?style=flat-square&logo=nodedotjs&logoColor=white">
+  <img alt="AWS" src="https://img.shields.io/badge/AWS-Cloud-232F3E?style=flat-square&logo=amazonaws&logoColor=FF9900">
+  <img alt="Amazon S3" src="https://img.shields.io/badge/Amazon-S3-569A31?style=flat-square&logo=amazons3&logoColor=white">
+  <img alt="Amazon EC2" src="https://img.shields.io/badge/Amazon-EC2-FF9900?style=flat-square&logo=amazonaws&logoColor=white">
+</p>
 
-- [Problem statement](#problem-statement)
-- [Key features](#key-features)
-- [Screenshots](#screenshots)
-- [Technology stack](#technology-stack)
-- [AWS services used](#aws-services-used)
-- [Project structure](#project-structure)
-- [Run locally](#run-locally)
-- [Environment variables](#environment-variables)
-- [AWS setup (S3, IAM, EC2, CloudWatch)](#aws-setup)
-- [Deploy to EC2](#deploy-to-ec2)
-- [API endpoints](#api-endpoints)
-- [Security](#security)
-- [Demonstration](#demonstration)
-- [Future enhancements](#future-enhancements)
+</div>
 
----
+<br>
 
-## Problem statement
+## Preview
 
-Colleges and training organisations issue thousands of certificates, but managing them is still manual:
+The application is live at **[certivault.27052027.xyz](https://certivault.27052027.xyz)** over HTTPS. Public pages need no login.
 
-- Certificates can be **forged or edited** — a PDF proves nothing on its own.
+| Page | Route | Access |
+|---|---|---|
+| Landing page | `/` | Public |
+| Verify a certificate (ID, QR link, or PDF upload) | `/verify`, `/verify/<id>` | Public |
+| Administrator sign-in | `/admin/login` | Public |
+| Dashboard · Issue · Certificates · Details | `/admin`, `/admin/issue`, `/admin/certificates` | Admin |
+| Cloud infrastructure status (EC2, S3, IAM) | `/admin/system` | Admin |
+
+
+<br>
+
+## About the project
+
+Colleges and training organisations issue thousands of certificates, but the process is still manual:
+
+- A PDF on its own proves nothing — certificates can be **forged or edited**.
 - **Verification is slow**: employers email or phone the institution.
-- Originals are **lost** on laptops and in drawers.
-- There is **no central record** and **no way to revoke** a certificate issued in error.
+- Originals get **lost**, and there is **no central record** or way to **revoke** a certificate issued in error.
 
-**CertiVault** keeps the authoritative record in the cloud. Every certificate gets a UUID, a public verification URL and QR code, and a SHA-256 fingerprint; the PDF itself is kept in a private, encrypted, versioned S3 bucket.
+CertiVault keeps the authoritative record in the cloud:
+
+1. **Issue** — an administrator generates a PDF from a template (with an embedded QR code) or uploads an existing one.
+2. **Store** — the PDF goes to a private S3 bucket; metadata, the certificate UUID and a **SHA-256 fingerprint** go to SQLite.
+3. **Verify** — anyone opens `/verify/<id>` (or scans the QR code) and sees `VERIFIED`, `REVOKED` or `NOT FOUND`.
+4. **Revoke** — an administrator can revoke a certificate with a reason; verification updates immediately.
+
+
+<br>
 
 ## Key features
 
-**Administrators**
-- Secure sign-in (bcrypt + JWT), protected routes
-- Dashboard with live totals (issued / active / revoked / this month) and a 6-month chart
-- Issue certificates two ways: **generate** a professional PDF from a template (with embedded QR code), or **upload** an existing PDF
-- Live certificate preview while filling the form
-- Certificate management: search by name or ID, filter by status, pagination, download, copy link, revoke (with reason)
-- Certificate details: storage location (S3 key + VersionId), SHA-256, **integrity check** against S3, embedded PDF preview, QR code
-- **Cloud infrastructure** page showing live EC2 instance metadata, S3 health and the IAM role the SDK is using
+<table>
+<tr>
+<th width="50%" align="left">Administrators</th>
+<th width="50%" align="left">Public verification (no login)</th>
+</tr>
+<tr>
+<td valign="top">
+<ul>
+<li>Secure sign-in (bcrypt + JWT) with protected routes</li>
+<li>Dashboard: issued / active / revoked / this month, plus a 6-month chart</li>
+<li>Issue by <b>generating</b> a PDF (embedded QR) or <b>uploading</b> one</li>
+<li>Live certificate preview while filling the form</li>
+<li>Search, filter by status, paginate, download, copy link, revoke with reason</li>
+<li>Details: S3 key + VersionId, SHA-256, <b>integrity check</b> against S3, PDF preview, QR code</li>
+<li>Cloud page with live EC2 metadata, S3 health and the active IAM role</li>
+</ul>
+</td>
+<td valign="top">
+<ul>
+<li>Verify by <b>certificate ID</b> or by scanning the <b>QR code</b></li>
+<li>Clear result: <code>VERIFIED</code>, <code>REVOKED</code> or <code>NOT FOUND</code></li>
+<li>Download active certificates through a <b>5-minute presigned S3 URL</b></li>
+<li><b>Upload a PDF</b> to check whether it is byte-for-byte identical to an issued certificate</li>
+<li>Public responses omit email, storage keys and internal IDs</li>
+</ul>
+</td>
+</tr>
+</table>
 
-**Public verifiers (no login)**
-- Verify by **certificate ID** or by scanning the **QR code** → `VERIFIED`, `REVOKED` or `NOT FOUND`
-- Download the certificate (active certificates only) via a **5-minute presigned S3 URL**
-- **Upload a PDF** to check whether it is byte-for-byte identical to an issued certificate
+<br>
 
-## Screenshots
+## System architecture
 
-> Add your screenshots to `documentation/screenshots/` after deployment and link them here. The full checklist is in [documentation/demonstration.md](documentation/demonstration.md#screenshot-checklist-for-the-report).
+<p align="center">
+  <img src="documentation/images/architecture.svg" alt="CertiVault AWS architecture" width="900">
+</p>
 
-| Page | File |
-|---|---|
-| Landing page | `documentation/screenshots/landing.png` |
-| Admin dashboard | `documentation/screenshots/dashboard.png` |
-| Issue certificate (live preview) | `documentation/screenshots/issue.png` |
-| Certificate details | `documentation/screenshots/details.png` |
-| Verification — VERIFIED / REVOKED | `documentation/screenshots/verify-verified.png`, `verify-revoked.png` |
-| Generated certificate PDF | `documentation/screenshots/certificate-pdf.png` |
-| S3 object · IAM role · EC2 · CloudWatch alarm | `documentation/screenshots/aws-*.png` |
+```mermaid
+flowchart LR
+    U[User browser] -->|HTTPS| N[Nginx on EC2]
+    N -->|static files| R[React build]
+    N -->|/api| E[Express API · PM2]
+    E -->|AWS SDK| S3[(Amazon S3)]
+    E --- DB[(SQLite)]
+    IAM{{IAM role}} -.->|temporary credentials| E
+    CW[CloudWatch] -.->|monitors| N
+```
+
+- **Nginx** is the only public entry point. It serves the React build and proxies `/api/*` to Express on `127.0.0.1:4000`.
+- **Express** issues and verifies certificates, writes PDFs to **S3**, and keeps metadata in SQLite.
+- **IAM role** supplies temporary credentials to the SDK via IMDSv2. **CloudWatch** watches the instance.
+
+Full layer-by-layer description, sequences and database schema: [documentation/architecture.md](documentation/architecture.md).
+
+<br>
 
 ## Technology stack
 
 | Layer | Technologies |
 |---|---|
-| Frontend | React 19, Vite, TypeScript, Tailwind CSS v4, React Router, Axios, Lucide icons |
-| Backend | Node.js 22 LTS, Express 5, TypeScript, AWS SDK for JavaScript v3, Multer, PDFKit, qrcode, zod, jsonwebtoken, bcryptjs, helmet, express-rate-limit |
-| Database | SQLite (`better-sqlite3`) — metadata only; PDFs are never stored in the database |
-| Cloud | Amazon EC2, Amazon S3, AWS IAM, Amazon CloudWatch |
-| Server | Amazon Linux 2023, Nginx (reverse proxy + static hosting), PM2 (process manager) |
+| **Frontend** | React 19, Vite, TypeScript, Tailwind CSS v4, React Router, Axios, Lucide icons |
+| **Backend** | Node.js 22 LTS, Express 5, TypeScript, AWS SDK for JavaScript v3, Multer, PDFKit, qrcode, zod, jsonwebtoken, bcryptjs, helmet, express-rate-limit |
+| **Database** | SQLite (`better-sqlite3`) — metadata only; PDFs are never stored in the database |
+| **Cloud** | Amazon EC2, Amazon S3, AWS IAM, Amazon CloudWatch |
+| **Server** | Amazon Linux 2023, Nginx (reverse proxy + static hosting), PM2 (process manager) |
 
-`bcryptjs` is a pure-JavaScript implementation of the same bcrypt algorithm — it avoids native compilation on EC2.
+<sub>`bcryptjs` is a pure-JavaScript implementation of the same bcrypt algorithm; it avoids native compilation on EC2.</sub>
 
-## AWS services used
+<br>
 
-| Service | Role in CertiVault | Configuration |
+## AWS infrastructure
+
+| Service | Purpose | Configuration |
 |---|---|---|
-| **Amazon EC2** | Hosts Nginx, the React build and the Express API (IaaS) | Amazon Linux 2023, Free-Tier-eligible micro instance, Elastic IP, IMDSv2 |
-| **Amazon S3** | Stores every certificate PDF | Private bucket, Block Public Access on, SSE-S3 encryption, versioning, HTTPS-only bucket policy, keys `certificates/<year>/<uuid>.pdf` |
-| **AWS IAM** | Lets EC2 access *only* the CertiVault bucket | Role `CertiVault-EC2-Role` (instance profile) with `s3:PutObject`/`s3:GetObject` on `certificates/*` and `s3:ListBucket` — **no access keys anywhere** |
-| **Amazon CloudWatch** | Monitors the server | EC2 `CPUUtilization` metric, alarm at ≥ 70 % for 10 min, optional SNS email |
-| *Security group* | Network firewall | SSH 22 from your IP only; HTTP 80 / HTTPS 443 public; backend port 4000 **not** exposed |
+| **Amazon EC2** | Hosts Nginx, the React build and the Express API | Amazon Linux 2023, Free-Tier-eligible micro instance, Elastic IP, IMDSv2 |
+| **Amazon S3** | Stores every certificate PDF | Private bucket, Block Public Access, SSE-S3 encryption, versioning, HTTPS-only bucket policy, keys `certificates/<year>/<uuid>.pdf` |
+| **AWS IAM** | Gives EC2 access to *only* the CertiVault bucket | Role `CertiVault-EC2-Role` with `s3:PutObject` / `s3:GetObject` on `certificates/*` and `s3:ListBucket` — **no access keys** |
+| **Amazon CloudWatch** | Monitors the server | EC2 `CPUUtilization` alarm at ≥ 70 % for 10 minutes, optional SNS email |
+| **Security group** | Network firewall | SSH 22 from your IP only; HTTP 80 / HTTPS 443 public; backend port 4000 **not** exposed |
 
-Architecture, data flows and the database schema: [documentation/architecture.md](documentation/architecture.md).
+Step-by-step console guide: [documentation/aws-setup.md](documentation/aws-setup.md). Policies are in [`infrastructure/aws-policy/`](infrastructure/aws-policy/).
 
-## Project structure
-
-```
-certiVault/
-├── backend/                       Express + TypeScript API
-│   ├── src/
-│   │   ├── config/                env validation, SQLite connection + schema
-│   │   ├── controllers/           auth, certificates, verify, dashboard, system, files
-│   │   ├── middleware/            JWT auth, Multer upload, rate limits, error handler
-│   │   ├── models/                SQL queries + API mappers
-│   │   ├── routes/                REST routes
-│   │   ├── services/
-│   │   │   ├── storage/           StorageService → S3StorageService | LocalStorageService (dev)
-│   │   │   ├── certificateService.ts   issuance workflow, integrity checks
-│   │   │   ├── pdfService.ts      PDFKit certificate template
-│   │   │   ├── qrService.ts       QR codes
-│   │   │   └── awsInfoService.ts  STS caller identity + EC2 IMDSv2 metadata
-│   │   ├── utils/                 errors, hashing, validation schemas, logger
-│   │   ├── app.ts                 Express app (helmet, CORS, JSON, routes)
-│   │   └── server.ts              entry point
-│   ├── scripts/                   create-admin.ts, check-aws.ts
-│   ├── database/                  SQLite file (git-ignored)
-│   └── .env.example
-├── frontend/                      React + Vite + Tailwind
-│   └── src/
-│       ├── components/            UI kit, certificate preview, revoke dialog, route guard
-│       ├── context/               auth + toast providers
-│       ├── hooks/  layouts/  lib/  services/  types/
-│       └── pages/                 Landing, Verify, Login, Dashboard, Issue, Certificates, Details, System
-├── infrastructure/
-│   ├── aws-policy/                IAM policy, EC2 trust policy, HTTPS-only bucket policy
-│   ├── nginx/certivault.conf      reverse proxy + SPA config
-│   └── deployment/                setup-ec2.sh, deploy.sh, ecosystem.config.cjs (PM2)
-├── documentation/
-│   ├── architecture.md            layers, connections, sequences, schema, API
-│   ├── aws-setup.md               step-by-step AWS Console guide
-│   ├── deployment.md              EC2 deployment + operations + troubleshooting
-│   ├── demonstration.md           demo script + screenshot checklist
-│   └── images/architecture.svg
-└── README.md
-```
+<br>
 
 ## Run locally
 
-Requirements: **Node.js 20.19+ or 22 LTS** (`node -v`) and Git. On macOS: `brew install node@22` or the installer from nodejs.org.
+**Requirements:** Node.js 20.19+ or 22 LTS, and Git.
+
+**1. Clone and install the backend**
 
 ```bash
 git clone https://github.com/Moukthika6706/certiVault.git
+cd certiVault/backend
+npm install
+cp .env.example .env
 ```
 
-```bash
-cd certiVault/backend && npm install && cp .env.example .env
-```
-
-Edit `backend/.env` and set `JWT_SECRET` (generate one with the command below). Leave `STORAGE_DRIVER=local` to start without AWS.
+**2. Configure** — edit `backend/.env` and set `JWT_SECRET`. Keep `STORAGE_DRIVER=local` to run without AWS. Generate a secret with:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
-Create an administrator (you'll be prompted for a password):
+**3. Create an administrator and start the API** (port 4000)
 
 ```bash
 npm run create-admin -- --name "Admin" --email admin@example.com
-```
-
-Start the API (port 4000):
-
-```bash
 npm run dev
 ```
 
-In a second terminal, start the frontend (port 5173, proxies `/api` to the backend):
+**4. Start the frontend** in a second terminal (port 5173, proxies `/api` to the backend)
 
 ```bash
-cd certiVault/frontend && npm install && npm run dev
+cd certiVault/frontend
+npm install
+npm run dev
 ```
 
-Open http://localhost:5173.
+Open **http://localhost:5173**.
 
-> **Local storage is not AWS.** With `STORAGE_DRIVER=local`, PDFs are written to `backend/storage/`. The startup log, the database (`storage_backend = LOCAL`) and an amber banner in the admin UI all say so. Switch to `STORAGE_DRIVER=s3` to use Amazon S3.
+> **Local storage is not AWS.** With `STORAGE_DRIVER=local`, PDFs are written to `backend/storage/`. The startup log, the database (`storage_backend = LOCAL`) and an amber banner in the admin UI all say so. Set `STORAGE_DRIVER=s3` to use Amazon S3.
 
-### Test S3 from your laptop (optional)
+<details>
+<summary><b>Environment variables</b> (<code>backend/.env</code> — template in <a href="backend/.env.example"><code>.env.example</code></a>)</summary>
+
+<br>
+
+| Variable | Example | Purpose |
+|---|---|---|
+| `NODE_ENV` | `production` | Runtime mode |
+| `HOST` / `PORT` | `127.0.0.1` / `4000` | API binds to localhost only; Nginx proxies to it |
+| `JWT_SECRET` | 96 hex chars | Signs admin sessions and local download tokens (required, min 32 chars) |
+| `JWT_EXPIRES_IN` | `8h` | Session lifetime |
+| `DATABASE_PATH` | `./database/certivault.db` | SQLite file |
+| `PUBLIC_APP_URL` | `https://certivault.27052027.xyz` | Base of verification URLs and QR codes |
+| `CORS_ORIGINS` | `https://certivault.27052027.xyz` | Allowed browser origins |
+| `TRUST_PROXY` | `true` | Behind Nginx: use `X-Forwarded-For` for rate limiting |
+| `STORAGE_DRIVER` | `s3` | `s3` = Amazon S3, `local` = development folder |
+| `AWS_REGION` | `ap-south-1` | Bucket region |
+| `S3_BUCKET_NAME` | `certivault-certificates-xyz` | Bucket name |
+| `MAX_UPLOAD_MB` | `5` | PDF size limit |
+| `PRESIGNED_URL_TTL_SECONDS` | `300` | Lifetime of download links |
+
+There are **no AWS access-key variables** by design. The frontend holds no secrets (`VITE_API_BASE_URL` is optional and defaults to `/api`).
+
+</details>
+
+<details>
+<summary><b>Test S3 from your laptop</b> (optional)</summary>
+
+<br>
 
 Create an IAM user *only for local testing* with the same policy, run `aws configure --profile certivault`, then:
 
@@ -184,106 +225,92 @@ Create an IAM user *only for local testing* with the same policy, run `aws confi
 export AWS_PROFILE=certivault
 ```
 
-Set `STORAGE_DRIVER=s3` and `S3_BUCKET_NAME` in `.env`, restart, and run `npm run check-aws`. On EC2 you never do this — the instance role supplies credentials. Delete the user's access key when done.
+Set `STORAGE_DRIVER=s3` and `S3_BUCKET_NAME` in `.env`, restart, and run `npm run check-aws`. On EC2 you never do this — the instance role supplies credentials. Delete the user's access key when you are done.
 
-## Environment variables
+</details>
 
-`backend/.env` (template: [`backend/.env.example`](backend/.env.example)):
+<details>
+<summary><b>Project structure</b></summary>
 
-| Variable | Example | Purpose |
-|---|---|---|
-| `NODE_ENV` | `production` | Runtime mode |
-| `HOST` / `PORT` | `127.0.0.1` / `4000` | API binds to localhost only; Nginx proxies to it |
-| `JWT_SECRET` | 96 hex chars | Signs admin sessions and local download tokens (min 32 chars, required) |
-| `JWT_EXPIRES_IN` | `8h` | Session lifetime |
-| `DATABASE_PATH` | `./database/certivault.db` | SQLite file |
-| `PUBLIC_APP_URL` | `http://13.233.x.x` | Base of verification URLs and QR codes |
-| `CORS_ORIGINS` | `http://13.233.x.x` | Allowed browser origins |
-| `TRUST_PROXY` | `true` | Behind Nginx: use `X-Forwarded-For` for rate limiting |
-| `STORAGE_DRIVER` | `s3` | `s3` = Amazon S3, `local` = dev folder |
-| `AWS_REGION` | `ap-south-1` | Bucket region |
-| `S3_BUCKET_NAME` | `certivault-certificates-xyz` | Bucket name |
-| `MAX_UPLOAD_MB` | `5` | PDF size limit |
-| `PRESIGNED_URL_TTL_SECONDS` | `300` | Lifetime of download links |
+<br>
 
-There are **no AWS access-key variables** by design. The frontend has no secrets at all (`VITE_API_BASE_URL` is optional and defaults to `/api`).
-
-## AWS setup
-
-Full click-by-click guide with verification steps and screenshot list: **[documentation/aws-setup.md](documentation/aws-setup.md)**. Summary:
-
-1. **S3** — create `certivault-certificates-<suffix>`: Block all public access ✅, Versioning **Enabled**, Default encryption **SSE-S3**, add the [HTTPS-only bucket policy](infrastructure/aws-policy/bucket-policy-https-only.json).
-2. **IAM** — create policy `CertiVault-S3-Access` from [this JSON](infrastructure/aws-policy/certivault-s3-access-policy.json) (replace the bucket name), then role `CertiVault-EC2-Role` (trusted entity: EC2) with that policy.
-3. **EC2** — launch Amazon Linux 2023 on a Free-Tier-eligible micro instance with key pair `certivault-key`, security group (SSH 22 = My IP, HTTP 80, HTTPS 443) and IAM instance profile `CertiVault-EC2-Role`. Associate an **Elastic IP**.
-4. **CloudWatch** — alarm `CertiVault-High-CPU` on `CPUUtilization ≥ 70` for 2 × 5 min (optional SNS email).
-
-## Deploy to EC2
-
-Full guide: **[documentation/deployment.md](documentation/deployment.md)**. On the instance:
-
-```bash
-sudo dnf install -y git && git clone https://github.com/Moukthika6706/certiVault.git ~/certiVault
+```
+certiVault/
+├── backend/                  Express + TypeScript API
+│   ├── src/
+│   │   ├── config/           env validation, SQLite connection + schema
+│   │   ├── controllers/      auth, certificates, verify, dashboard, system, files
+│   │   ├── middleware/       JWT auth, Multer upload, rate limits, error handler
+│   │   ├── models/           SQL queries + API mappers
+│   │   ├── routes/           REST routes
+│   │   ├── services/         certificate workflow, PDF, QR, AWS info,
+│   │   │   └── storage/      StorageService → S3StorageService | LocalStorageService
+│   │   └── utils/            errors, hashing, validation, logger
+│   └── scripts/              create-admin.ts, check-aws.ts
+├── frontend/src/             React + Vite + Tailwind (pages, components, context, services)
+├── infrastructure/
+│   ├── aws-policy/           IAM policy, EC2 trust policy, HTTPS-only bucket policy
+│   ├── nginx/                certivault.conf (reverse proxy + SPA routing)
+│   └── deployment/           setup-ec2.sh, deploy.sh, ecosystem.config.cjs (PM2)
+└── documentation/            architecture, AWS setup, deployment, demonstration
 ```
 
+</details>
+
+<br>
+
+## Deployment
+
+CertiVault is deployed at **[https://certivault.27052027.xyz](https://certivault.27052027.xyz)** on a single EC2 instance:
+
+| Component | Role |
+|---|---|
+| **Nginx** | Public entry point on ports 80/443; serves the React build and proxies `/api/*` |
+| **PM2** | Keeps the Express API (`certivault-api`) running on `127.0.0.1:4000` and restarts it on failure |
+| **Amazon S3** | Private certificate storage, accessed through the instance's IAM role |
+
+Provisioning and releases use the scripts in [`infrastructure/deployment/`](infrastructure/deployment/):
+
 ```bash
-bash ~/certiVault/infrastructure/deployment/setup-ec2.sh
+bash ~/certiVault/infrastructure/deployment/setup-ec2.sh   # one-time: swap, Nginx, Node.js 22, PM2
+bash ~/certiVault/infrastructure/deployment/deploy.sh      # build backend + frontend, publish, reload Nginx, restart PM2
 ```
 
-Create `backend/.env` (`NODE_ENV=production`, `STORAGE_DRIVER=s3`, bucket, `PUBLIC_APP_URL=http://<elastic-ip>`, `TRUST_PROXY=true`, new `JWT_SECRET`), then:
+Set `PUBLIC_APP_URL` and `CORS_ORIGINS` to the HTTPS domain in `backend/.env` so QR codes and verification links point to the live site. The full walkthrough — environment file, admin creation, HTTPS setup, operations and troubleshooting — is in **[documentation/deployment.md](documentation/deployment.md)**.
 
-```bash
-bash ~/certiVault/infrastructure/deployment/deploy.sh
-```
+<br>
 
-```bash
-cd ~/certiVault/backend && npm run check-aws:prod && npm run create-admin:prod -- --name "Admin" --email you@example.com
-```
 
-PM2 basics: `pm2 status`, `pm2 logs certivault-api`, `pm2 restart certivault-api`, `pm2 startup` + `pm2 save` for reboot persistence.
 
-## API endpoints
+## Security highlights
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| GET | `/api/health` | – | Health + storage backend |
-| POST | `/api/auth/login` | – | Admin login → JWT (rate-limited) |
-| GET | `/api/auth/me` | JWT | Current admin |
-| GET | `/api/dashboard/stats` | JWT | Dashboard numbers |
-| GET | `/api/system` | JWT | EC2 / S3 / IAM live status |
-| GET | `/api/certificates` | JWT | List · `search`, `status`, `page`, `pageSize` |
-| POST | `/api/certificates` | JWT | Issue (multipart, `mode=generate\|upload`, `file`) |
-| GET | `/api/certificates/:id` | JWT | Details + QR code |
-| GET | `/api/certificates/:id/download-url` | JWT | Presigned URL (`disposition=inline\|attachment`) |
-| GET | `/api/certificates/:id/integrity` | JWT | Re-hash S3 object and compare |
-| PATCH | `/api/certificates/:id/revoke` | JWT | Revoke with optional reason |
-| GET | `/api/verify/:id` | – | `VERIFIED` / `REVOKED` / `NOT_FOUND` |
-| GET | `/api/verify/:id/download-url` | – | Presigned URL (active only) |
-| GET | `/api/verify/:id/integrity` | – | Public integrity check |
-| POST | `/api/verify/file` | – | Upload PDF → authenticity by SHA-256 |
+| Area | Decision |
+|---|---|
+| **Credentials** | No AWS keys in code, `.env` or the frontend. EC2 receives temporary, auto-rotated credentials from its IAM role via IMDSv2. |
+| **Least privilege** | The role can only `PutObject` / `GetObject` under `certificates/` and `ListBucket` on one bucket — no delete. |
+| **Storage** | Private bucket with Block Public Access, SSE-S3 at rest, HTTPS-only bucket policy and versioning. Files are delivered only via 5-minute presigned URLs. |
+| **Transport & network** | Served over HTTPS. Only 80/443 are public, SSH is restricted to one IP, and the API binds to `127.0.0.1` behind Nginx. |
+| **Authentication** | bcrypt (cost 12) hashes, JWT sessions, a dummy-hash comparison for unknown emails, login rate limiting. Admins are created only through a server-side script. |
+| **Input handling** | zod validation on every write, 5 MB upload limit, PDF signature (`%PDF-`) check, duplicate detection by hash. |
+| **Responses** | Public responses omit email, storage keys and internal IDs; unexpected errors return a generic message; helmet headers and strict CORS. |
+| **Repository** | `.env`, `*.pem`, databases, uploads and `node_modules` are git-ignored. |
 
-Public endpoints are rate-limited to 60 requests/minute per IP. Errors use `{ "error": { "code", "message", "fields"? } }`.
+<br>
 
-## Security
+## Documentation
 
-- **No AWS keys in code, `.env`, or the frontend.** EC2 gets temporary, auto-rotated credentials from its IAM role through IMDSv2; the SDK's default credential chain picks them up.
-- **Least privilege** — the role can only `PutObject`/`GetObject` under `certificates/` and `ListBucket` on one bucket; no delete.
-- **Private bucket** — Block Public Access, SSE-S3 at rest, HTTPS-only bucket policy, versioning against overwrites/deletes. Files are delivered only through **5-minute presigned URLs**.
-- **Network** — only 80/443 public; SSH restricted to your IP; the API binds to `127.0.0.1` behind Nginx.
-- **Authentication** — bcrypt (cost 12) password hashes, JWT sessions, constant-time-style login (dummy hash for unknown emails), login rate limit; admins created only via a server-side script.
-- **Input handling** — zod validation on every write, Multer memory storage with a 5 MB limit, PDF signature (`%PDF-`) check, duplicate-file detection by hash.
-- **Response hygiene** — public responses omit email, storage keys and internal IDs; unexpected errors return a generic message (details only in server logs); helmet security headers; strict CORS.
-- **Repository hygiene** — `.env`, `*.pem`, databases, uploaded files and `node_modules` are git-ignored.
-
-## Demonstration
-
-The step-by-step end-to-end demo (issue → S3 object → private bucket → IAM role → EC2 → CloudWatch → QR verify → revoke → REVOKED) is in **[documentation/demonstration.md](documentation/demonstration.md)**, with a screenshot checklist for the report.
+| Document | Contents |
+|---|---|
+| [architecture.md](documentation/architecture.md) | Layers, connections, request sequences, database schema, API |
+| [aws-setup.md](documentation/aws-setup.md) | Step-by-step AWS Console guide (S3, IAM, EC2, Elastic IP, CloudWatch) |
+| [deployment.md](documentation/deployment.md) | EC2 deployment, HTTPS, operations, troubleshooting |
+| [demonstration.md](documentation/demonstration.md) | End-to-end demo script and screenshot checklist |
 
 ## Future enhancements
 
-- HTTPS with a custom domain (Route 53 + Let's Encrypt or an Application Load Balancer + ACM)
-- Amazon RDS (PostgreSQL) instead of SQLite; the model layer is already isolated
-- CloudWatch Agent for memory/disk metrics and shipping PM2 logs to CloudWatch Logs
+- Amazon RDS (PostgreSQL) in place of SQLite — the model layer is already isolated
+- CloudWatch Agent for memory and disk metrics, and PM2 logs shipped to CloudWatch Logs
 - Amazon SES to email certificates to recipients
 - CloudFront in front of the static site
-- Bulk issuance from CSV, multiple administrators with roles, audit log
-- Infrastructure as Code (CloudFormation / Terraform) for one-command environment creation
+- Bulk issuance from CSV, administrator roles and an audit log
+- Infrastructure as Code (CloudFormation or Terraform) for one-command environment creation
